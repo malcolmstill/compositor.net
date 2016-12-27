@@ -19,7 +19,7 @@ namespace Starfury
 		public static List<ISurface> surfaces = new List<ISurface>();
 		public static Stopwatch Time = Stopwatch.StartNew();
 		public static IMode currentMode = null;
-		public bool renderNeeded = true;
+		public static bool renderNeeded = true;
 		public static Xkb.Context context;
 		public static Xkb.Keymap keymap;
 		public static Xkb.State state;
@@ -54,7 +54,7 @@ namespace Starfury
 		protected override void OnResize(EventArgs e)
 		{
   			base.OnResize(e);
-            //GL.Viewport(0, 0, Width, Height);
+			Starfury.renderNeeded = true;
 		}
 
 		protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
@@ -140,25 +140,24 @@ namespace Starfury
 
 			compositor.RenderFrame += (sender, e) =>
             {
-				//Console.WriteLine("Dispatching");
 				display.GetEventLoop().Dispatch(5);
 				display.FlushClients();
 
-				if (compositor.renderNeeded)
+				if (Starfury.renderNeeded)
 				{
 
             		GL.Viewport(0, 0, compositor.Width, compositor.Height);
                 	GL.Clear(ClearBufferMask.ColorBufferBit);
 
-					//Console.WriteLine("Beginning render");
 					currentMode.Render(compositor.Width, compositor.Height);
 					compositor.SwapBuffers();
+					Starfury.renderNeeded = false;
 				}
 				// During initial development use the following
 				// to check we're not collecting memory that should
 				// be kept.
-				GC.Collect();
-				GC.WaitForPendingFinalizers();
+				//GC.Collect();
+				//GC.WaitForPendingFinalizers();
             };
         	compositor.VSync = VSyncMode.Off;
 			compositor.Run(60.0);

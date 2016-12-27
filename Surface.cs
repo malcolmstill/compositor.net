@@ -83,6 +83,7 @@ namespace Starfury
 		{
 			committed = true;
 			this.CreateTexture();
+			Starfury.renderNeeded = true;
 		}
 
 		public override void SetInputRegion(IntPtr client, IntPtr resource, IntPtr region)
@@ -98,6 +99,7 @@ namespace Starfury
 		public override void Delete(IntPtr resource)
 		{
 			Starfury.RemoveSurface(this.resource);
+			Starfury.renderNeeded = true;
 		}
 
 		public SfSurface GetSurface()

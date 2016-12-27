@@ -7,16 +7,16 @@ namespace Starfury
 {
     public class DesktopMode : Mode, IMode
     {
-        string vertexSource = "#version 130\n" + 
-                                "in vec3 position;\n" +
-                                "in vec2 texcoord;\n" +
-                                "out vec2 Texcoord;\n" +
-                                "uniform mat4 ortho;" +
-                                "void main()\n" +
-                                "{\n" +
-                                "    Texcoord = texcoord;\n" + 
-                                "    gl_Position = ortho * vec4(position, 1.0);\n" +
-                                "}";
+        string vertexSource = @"#version 130
+                                in vec3 position;
+                                in vec2 texcoord;
+                                out vec2 Texcoord;
+                                uniform mat4 ortho;
+                                void main()
+                                {
+                                    Texcoord = texcoord;
+                                    gl_Position = ortho * vec4(position, 1.0);
+                                }";
         string fragmentSource = @"#version 130
                                     in vec2 Texcoord;
                                     out vec4 outColor;
@@ -24,8 +24,6 @@ namespace Starfury
                                     void main()
                                     {
                                         outColor = texture(tex, Texcoord);
-                                        //outColor = vec4(1.0, 0.0, 0.0, 0.5);
-                                        //outColor = mix(vec4(1.0,0.0,0.0,0.5), texture(tex, Texcoord), 0.5);
                                     }";
         Pipeline desktopPipeline;
         float width;
@@ -45,18 +43,6 @@ namespace Starfury
         
         public void RenderSurface(SfSurface surface)
         {
-            /*
-            GL.BindTexture(TextureTarget.Texture2D, surface.Texture());
-            GL.Begin(BeginMode.Triangles);
-            GL.Vertex3(-1.0f, -1.0f, 0.0f);
-            GL.TexCoord2(0.0f, 0.0f);
-            GL.Vertex3(1.0f, -1.0f, 0.0f);
-            GL.TexCoord2(1.0f, 0.0f);
-            GL.Vertex3(1.0f, 1.0f, 0.0f);
-            GL.TexCoord2(1.0f, 1.0f);
-            GL.End();
-            */
-
             int posAttrib = desktopPipeline.GetAttribLocation("position");
             GL.EnableVertexAttribArray(posAttrib);
 
