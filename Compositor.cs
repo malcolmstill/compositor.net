@@ -15,7 +15,7 @@ namespace Starfury
 		public override void CreateSurface(IntPtr clientPtr, IntPtr resourcePtr, UInt32 id)
 		{
 			SfSurface surface = new SfSurface(clientPtr, id); // Make new Surface : WlSurface resource
-			Starfury.surfaces.Add(surface);
+			Starfury.Surfaces.Add(surface);
 		}
 
 		public override void CreateRegion(IntPtr clientPtr, IntPtr resourcePtr, UInt32 id)

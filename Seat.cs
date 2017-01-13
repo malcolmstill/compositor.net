@@ -13,12 +13,14 @@ namespace Starfury
 
 		public override void GetPointer(IntPtr client, IntPtr resource, UInt32 id)
 		{
-			Console.WriteLine("Overloaded GetPointer");
+			WlPointer pointer = new WlPointer(client, id);
+			pointer.client.pointer = pointer;
 		}
 		
 		public override void GetKeyboard(IntPtr client, IntPtr resource, UInt32 id)
 		{
 			WlKeyboard keyboard = new WlKeyboard(client, id);
+			keyboard.client.keyboard = keyboard;
 			if (keyboard.GetVersion() >= 4)
 			{
 				keyboard.SendRepeatInfo(30, 200);

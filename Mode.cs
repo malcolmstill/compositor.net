@@ -22,17 +22,23 @@ namespace Starfury
         }
     }
 
+    /*
     public interface IMode
     {
         void Render(int width, int height);
+        void MouseMove(int x, int y);
+        void MouseDown();
+        ISurface SurfaceUnderPointer(int x, int y);
     }
+    */
 
     public class Mode
     {
         private static List<KeyBinding> keyBindings = new List<KeyBinding>();
-        private int view;
+        public VirtualDesktop virtualDesktop;
+        // public Screen screen;
 
-        public void KeyboardHandler(UInt32 time, int key, int state)
+        public virtual void KeyPress(uint time, uint key, uint state)
         {
             /*
             ISurface surface = view.ActiveSurface();
@@ -57,6 +63,26 @@ namespace Starfury
                 surface.Client.Keyboard.SendModifiers(0, time, key, state);
             }
             */
+        }
+
+        public virtual void Render(int width, int height)
+        {
+
+        }
+
+        public virtual void MouseMove(uint time, int x, int y)
+        {
+
+        }
+
+        public virtual void MouseButton(uint time, uint button, uint state)
+        {
+
+        }
+
+        public virtual ISurface SurfaceUnderPointer(int x, int y)
+        {
+            return null;
         }
     }
 }

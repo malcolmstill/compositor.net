@@ -1,21 +1,23 @@
 
 using System;
+using System.Linq;
 using OpenTK;
 using OpenTK.Graphics.OpenGL;
 
 namespace Starfury
 {
-    public class DesktopMode : Mode, IMode
+    public class DesktopMode : Mode
     {
         string vertexSource = @"#version 130
                                 in vec3 position;
                                 in vec2 texcoord;
                                 out vec2 Texcoord;
                                 uniform mat4 ortho;
+                                uniform mat4 translate;
                                 void main()
                                 {
                                     Texcoord = texcoord;
-                                    gl_Position = ortho * vec4(position, 1.0);
+                                    gl_Position = ortho * translate * vec4(position, 1.0);
                                 }";
         string fragmentSource = @"#version 130
                                     in vec2 Texcoord;
@@ -30,8 +32,9 @@ namespace Starfury
         float height;
         int orthoLocation;
         Matrix4 orthographicProjection;
+        ISurface ActiveSurface { get; set; }
 
-        public DesktopMode(int width, int height)
+        public DesktopMode()
         {
             desktopPipeline = new Pipeline(vertexSource, fragmentSource);
         }
@@ -43,6 +46,7 @@ namespace Starfury
         
         public void RenderSurface(SfSurface surface)
         {
+
             int posAttrib = desktopPipeline.GetAttribLocation("position");
             GL.EnableVertexAttribArray(posAttrib);
 
@@ -64,7 +68,79 @@ namespace Starfury
 
         public void RenderSurface(SfXdgToplevelV6 surface)
         {
+            int translateLocation = desktopPipeline.GetUniformLocation("translate");
+            Matrix4 translate = Matrix4.CreateTranslation(surface.X, surface.Y, 0.0f);
+            GL.UniformMatrix4(translateLocation, false, ref translate);
             this.RenderSurface(surface.GetSurface());
+        }
+
+        public override void KeyPress(uint time, uint key, uint state)
+        {
+            Console.WriteLine("DesktopMode: key " + key);
+            ActiveSurface?.SendKey(time, key, state);
+        }
+
+        public override void MouseMove(uint time, int x, int y)
+        {
+            Starfury.MovingSurface?.Update(x, y);
+
+            ISurface surface = SurfaceUnderPointer(Starfury.Compositor.Mouse.X, Starfury.Compositor.Mouse.Y);
+            if (surface != Starfury.PointerSurface)
+            {
+                Starfury.PointerSurface?.SendMouseLeave();
+                Starfury.PointerSurface = surface;
+                Starfury.PointerSurface?.SendMouseEnter(x - Starfury.PointerSurface.X, y - Starfury.PointerSurface.Y);
+            }
+
+            Starfury.PointerSurface?.SendMouseMove(time, x - Starfury.PointerSurface.X, y - Starfury.PointerSurface.Y);
+        }
+
+        public override void MouseButton(uint time, uint button, uint state)
+        {
+            // Case where mouse button 1 is released and there is a currently moving surface...
+            if (state == 0 && button == 0x110 && Starfury.MovingSurface != null)
+            {
+                // ...the surface should stop moving
+                Starfury.MovingSurface = null;
+            }
+
+            // Find the topmost surface under the pointer
+            ISurface surface = SurfaceUnderPointer(Starfury.Compositor.Mouse.X, Starfury.Compositor.Mouse.Y);
+            if (surface != null && surface != ActiveSurface)
+            {
+                ActiveSurface?.Deactivate();
+                ActiveSurface?.SendKeyboardLeave();
+
+                this.virtualDesktop.Surfaces.Remove(surface);
+                this.virtualDesktop.Surfaces.Add(surface);
+                surface.Activate();
+                surface.SendKeyboardEnter();
+                ActiveSurface = surface;
+            }
+            else if (surface == null)
+            {
+                ActiveSurface?.Deactivate();
+                ActiveSurface?.SendKeyboardLeave();
+                ActiveSurface = null;
+            }
+            else
+            {
+
+            }
+
+            surface?.SendMouseButton(time, button, state);
+        }
+
+        public override ISurface SurfaceUnderPointer(int x, int y)
+        {
+            foreach (ISurface surface in this.virtualDesktop.Surfaces.AsEnumerable().Reverse())
+            {
+                if (x >= surface.X && x <= (surface.X + surface.GetSurface().Width) && y >= surface.Y && y <= (surface.Y + surface.GetSurface().Height))
+                {
+                    return surface;
+                }
+            }        
+            return null;    
         }
 
         /*
@@ -79,8 +155,7 @@ namespace Starfury
         }
         */
 
-        // Implement IMode.Render
-        public void Render(int width, int height)
+        public override void Render(int width, int height)
         {
             desktopPipeline.Use();
             // GL.Enable (EnableCap.Texture2D);
@@ -89,8 +164,10 @@ namespace Starfury
             GL.BlendFunc(BlendingFactorSrc.SrcAlpha, BlendingFactorDest.OneMinusSrcAlpha);
             orthoLocation = desktopPipeline.GetUniformLocation("ortho");
             GL.UniformMatrix4(orthoLocation, false, ref orthographicProjection);
-            
-            foreach (dynamic surface in Starfury.surfaces)
+
+            // Console.WriteLine(this.virtualDesktop);
+            // Console.WriteLine(this.virtualDesktop.Surfaces);
+            foreach (dynamic surface in this.virtualDesktop.Surfaces)
             {
                 RenderSurface(surface);
                 surface.GetSurface().SendDone();

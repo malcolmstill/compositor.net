@@ -8,9 +8,9 @@ namespace Starfury
 {
     public class SubcompositorGlobal : WlSubcompositorGlobal
     {
-	public override void Bind(IntPtr client, IntPtr data, UInt32 version, UInt32 id)
-	{
-
-	}
+        public override void Bind(IntPtr client, IntPtr data, UInt32 version, UInt32 id)
+        {
+            //new SfSubcompositor(client, id);
+        }
     }
 }

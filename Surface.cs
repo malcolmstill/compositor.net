@@ -9,25 +9,20 @@ using System.Runtime.InteropServices;
 
 namespace Starfury
 {
-	public interface ISurface
-	{
-		SfSurface GetSurface();
-		void Render();
-		//int Texture();
-	}
-
     public class SfSurface : WlSurface, ISurface
     {
-		public int x { get; set; } = 0;
-		public int y { get; set; } = 0;
+		public int X { get; set; } = 0;
+		public int Y { get; set; } = 0;
+		public int Width { get; set; }
+		public int Height { get; set; }
 		public int originX { get; set; } = 0;
 		public int originY { get; set; } = 0;
 		public IntPtr buffer = IntPtr.Zero;
 		public WlCallback callback { get; set; }
 		//public WlCallback callback = new WlCallback(client, 0, false);
 		public bool callbackNeeded = false;
-		public Int32 width { get; set; } = 0;
-		public Int32 height { get; set; } = 0;
+		// public Int32 width { get; set; } = 0;
+		// public Int32 height { get; set; } = 0;
 		public bool committed = false;
 		public int texture = -1;
 
@@ -67,18 +62,6 @@ namespace Starfury
 			callbackNeeded = true;
 		}
 
-		/*
-		public override void Frame(IntPtr client, IntPtr resource, UInt32 callbackId)
-		{
-			if (callback != null)
-			{
-				callback.SendDone(0); // Don't need remove because we pass in false
-				callback.Remove();
-			}
-			callback = new WlCallback(client, callbackId, false);
-		}
-		*/
-
 		public override void Commit(IntPtr client, IntPtr resource)
 		{
 			committed = true;
@@ -94,6 +77,11 @@ namespace Starfury
 		public override void SetOpaqueRegion(IntPtr client, IntPtr resource, IntPtr region)
 		{
 			
+		}
+
+		public override void Damage(IntPtr client, IntPtr resource, Int32 x, Int32 y, Int32 width, Int32 height)
+		{
+
 		}
 
 		public override void Delete(IntPtr resource)
@@ -116,17 +104,51 @@ namespace Starfury
 			}
 		}
 
-		/*
-		public void SendDone()
+		public void Activate()
 		{
-			if (callback != null)
-			{
-				callback.SendDone((UInt32) Starfury.Time.ElapsedMilliseconds);
-				callback.Remove();
-				callback = null;
-			}
+
 		}
-		*/
+
+		public void Deactivate()
+		{
+
+		}
+
+		public void SendMouseButton(uint time, uint button, uint state)
+		{
+			client.pointer?.SendButton(0, time, button, state);
+		}
+
+		public void SendMouseEnter(int x, int y)
+		{
+			client.pointer?.SendEnter(0, this.resource, x, y);
+		}
+
+		public void SendMouseLeave()
+		{
+			client.pointer?.SendLeave(0, this.resource);
+		}
+
+		public void SendMouseMove(uint time, int x, int y)
+		{
+			client.pointer?.SendMotion(time, 256 * x, 256 * y);
+		}
+
+		public void SendKeyboardEnter()
+		{
+			WlArray array = new WlArray();
+			client.keyboard?.SendEnter(0, this.resource, array.array);
+		}
+		
+		public void SendKeyboardLeave()
+		{
+			client.keyboard?.SendLeave(0, this.resource);
+		}
+
+		public void SendKey(uint time, uint key, uint state)
+		{
+			client.keyboard?.SendKey(0, time, key, state);
+		}
 
 		public void SendDone()
 		{
@@ -143,12 +165,17 @@ namespace Starfury
 			return texture;
 		}
 
+		public bool PointInSurface(int x, int y)
+		{
+			return x >= this.X && x <= (this.X + this.Width) && y >= this.Y && y <= (this.Y + this.Height);
+		}
+
 		public void Geometry(int vertAttrib, int texcoordAttrib)
 		{			  
 			Vector3[] verts = new Vector3[] { new Vector3(0.0f, 0.0f, 0.0f),
-							  	new Vector3(0.0f, this.height, 0.0f),
-							  	new Vector3(this.width, this.height, 0.0f),
-							  	new Vector3(this.width, 0.0f, 0.0f) };
+							  	new Vector3(0.0f, this.Height, 0.0f),
+							  	new Vector3(this.Width, this.Height, 0.0f),
+							  	new Vector3(this.Width, 0.0f, 0.0f) };
 
 			Vector2[] texcoords = new Vector2[] { new Vector2(0.0f, 0.0f),
 									new Vector2(0.0f, 1.0f),
@@ -185,8 +212,8 @@ namespace Starfury
 			if (buffer != IntPtr.Zero)
 			{
 				SHMBuffer shmBuffer = new SHMBuffer(buffer);
-				width = shmBuffer.GetWidth();
-				height = shmBuffer.GetHeight();
+				Width = shmBuffer.GetWidth();
+				Height = shmBuffer.GetHeight();
 				IntPtr data = shmBuffer.GetData();
 
 				if (texture >= 0)
@@ -201,7 +228,7 @@ namespace Starfury
             	GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int) TextureMinFilter.Linear);
             	GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int) TextureMagFilter.Linear);
 
-            	GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, width, height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, data);
+            	GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, Width, Height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, data);
 				Utils.ReleaseBuffer(buffer);
 				buffer = IntPtr.Zero;
 			}
