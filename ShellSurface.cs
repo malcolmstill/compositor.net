@@ -6,51 +6,45 @@ using System.Collections.Generic;
 
 namespace WindowManager
 {
-    public class WMSubsurface : WlSubsurface, ISurface
+    public class WMShellSurface : WlShellSurface, ISurface
     {
-        public WMSurface surface;
-        public ISurface Parent { get; set; }
+		public WMSurface WMSurface { get; set; }
 		public int X { get; set; } = 0;
 		public int Y { get; set; } = 0;
 		public int Width { get; set; }
 		public int Height { get; set; }
-        
-        public WMSubsurface(IntPtr clientPtr, Int32 version, UInt32 id) : base(clientPtr, version, id)
-        {
+		public int originX { get; set; } = 0;
+		public int originY { get; set; } = 0;
 
-        }
-
-        public WMSubsurface(IntPtr client, Int32 version, UInt32 id, IntPtr resource) : base(client, version, id, resource)
+		public WMShellSurface(IntPtr client, Int32 version, UInt32 id) : base(client, version, id)
 		{
-			IntPtr surfacePtr = resource;
+		
+		}
+
+        public WMShellSurface(IntPtr client, Int32 version, UInt32 id, IntPtr resource) : base(client, version, id, resource)
+		{
+			IntPtr surfacePtr = Resource.GetUserData(resource);
 			Resource r = this.client.FindResource(surfacePtr);
 			if (r != null)
 			{
-				this.surface = (WMSurface) r;
+                Console.WriteLine("WlShellSurface: setting WMSurface to " + r);
+				this.WMSurface = (WMSurface) r;
+				this.WMSurface.Role = this;
 			}
 		}
-        
-		
-		public override void Destroy(IntPtr client, IntPtr resource)
+
+		public override void Delete(IntPtr resource)
 		{
-			// Client has Destroy'd this subsurface, we need to remove it from the
-			// parent's subsurfaces
-			Console.WriteLine("Removing subsurface " + this + " which has parent " + Parent);
-			Parent.Surface.Subsurfaces.Remove(this);
+			Console.WriteLine("Delete called on " + this);
+			WindowManager.RemoveSurface(this);
 		}
 
-        public override string ToString()
+		public WMSurface Surface
 		{
-			return String.Format("WMSubsurface@{0:X8}", resource.ToInt32());
+			get {
+				return WMSurface;
+			}
 		}
-
-        public WMSurface Surface
-        {
-            get
-            {
-                return surface;
-            }
-        }
 
 		public void Render()
 		{
@@ -67,7 +61,7 @@ namespace WindowManager
             
 		}
 
-        public void SendMouseButton(uint time, uint button, uint state)
+		public void SendMouseButton(uint time, uint button, uint state)
 		{
 			this.Surface.SendMouseButton(time, button, state);
 		}
@@ -109,11 +103,9 @@ namespace WindowManager
 
 		public List<ISurface> Subsurfaces { get; set; } = new List<ISurface>();
 
-        public override void SetPosition(IntPtr client, IntPtr resource, Int32 x, Int32 y)
-        {
-			Console.WriteLine("Setting position of " + this + ": " + x + " " + y);
-            X = x;
-            Y = y;           
-        }
+		public override void Move(IntPtr client, IntPtr resource, IntPtr seat, UInt32 serial)
+		{
+			WindowManager.MovingSurface = new MovingSurface(this, this.X, this.Y, WindowManager.Compositor.Mouse.X, WindowManager.Compositor.Mouse.Y);
+		}
     }
 }

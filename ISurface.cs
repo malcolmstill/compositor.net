@@ -1,5 +1,7 @@
 
-namespace Starfury
+using System.Collections.Generic;
+
+namespace WindowManager
 {
 	public interface ISurface
 	{
@@ -7,7 +9,7 @@ namespace Starfury
         int Y { get; set; }
         int Width { get; set; }
         int Height { get; set; }
-		SfSurface GetSurface();
+		WMSurface Surface { get; }
 		void Render();
 		void Activate();
 		void Deactivate();
@@ -19,7 +21,9 @@ namespace Starfury
 		void SendKeyboardEnter();
 		void SendKeyboardLeave();
 		void SendKey(uint time, uint key, uint state);
+		// SendModifiers(UInt32 serial, UInt32 mods_depressed, UInt32 mods_latched, UInt32 mods_locked, UInt32 group) 
+		void SendMods(uint mods_depressed, uint mods_latched, uint mods_locked, uint group);
 		//int Texture();
-		//List<ISurface> Subsurfaces { get; set; }
+		List<ISurface> Subsurfaces { get; set; }
 	}
 }

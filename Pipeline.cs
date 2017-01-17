@@ -2,7 +2,7 @@
 using System;
 using OpenTK.Graphics.OpenGL;
 
-namespace Starfury
+namespace WindowManager
 {
     public class Pipeline : IDisposable
     {

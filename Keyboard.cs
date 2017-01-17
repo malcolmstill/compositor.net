@@ -6,7 +6,7 @@ using System.Linq;
 
 // We want function taking OpenTK Key to evdev integer
 
-namespace Starfury
+namespace WindowManager
 {
     public static class EvdevKeyboard
     {

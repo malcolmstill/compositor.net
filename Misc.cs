@@ -1,7 +1,7 @@
 
 using System;
 
-namespace Starfury
+namespace WindowManager
 {
     public class MovingSurface
     {
@@ -24,7 +24,7 @@ namespace Starfury
         {
             surface.X = surfaceX + newPointerX - pointerX;
             surface.Y = surfaceY + newPointerY - pointerY;
-            Starfury.renderNeeded = true;
+            WindowManager.renderNeeded = true;
         }
     }
 }

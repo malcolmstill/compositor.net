@@ -11,25 +11,34 @@ using System.Runtime.InteropServices;
 using System.Collections.Generic;
 using System.Threading;
 
-namespace Starfury
+namespace WindowManager
 {
-    class Starfury : GameWindow
+    class WindowManager : GameWindow
     {
-		public static Starfury Compositor { get; set; }
+		public static WindowManager Compositor { get; set; }
 		public static Display display = new Display();
-		public static List<ISurface> Surfaces = new List<ISurface>(); // store a list of all surfaces regardless of view
+		// public static List<ISurface> Surfaces = new List<ISurface>(); // store a list of all surfaces regardless of view
+		public static List<WMSurface> Surfaces = new List<WMSurface>();
 		public static List<VirtualDesktop> VirtualDesktops = new List<VirtualDesktop>();
 		public static Stopwatch Time = Stopwatch.StartNew();
+		long lastTime = 0;
 		//public static IMode currentMode = null;
 		public static VirtualDesktop CurrentVirtualDesktop;
 		public static bool renderNeeded = true;
 		public static Xkb.Context context;
 		public static Xkb.Keymap keymap;
 		public static Xkb.State state;
+		public static uint[] Mods = new uint[4];
 		public static MovingSurface MovingSurface = null;
 		public static ISurface ResizingSurface = null;
 		public static ISurface PointerSurface = null;
-		//public static ISurface FocussedSurface = null;
+		public static int WlCallbackCount = 0;
+		public static TTY tty;
+
+		/*
+		So previously surfaces were swapped out of the list of Surfaces when their role changed
+		RemoveSurface was only removing the specialised WlResource
+		*/
 
 		public static void RemoveSurface(ISurface surface)
 		{
@@ -37,46 +46,59 @@ namespace Starfury
 			{
 				PointerSurface = null;
 			}
-			Surfaces.Remove(surface);
-			foreach (VirtualDesktop virtualDesktop in VirtualDesktops)
+			if (surface != null)
 			{
-				virtualDesktop.RemoveSurface(surface);
+				Surfaces.Remove(surface.Surface);
+				foreach (VirtualDesktop virtualDesktop in VirtualDesktops)
+				{
+					virtualDesktop.RemoveSurface(surface.Surface.Role);
+				}
 			}
 		}
 
 		public static void RemoveSurface(IntPtr resourcePointer)
 		{
-			ISurface surface = Surfaces.Find(r => ((Resource) r).resource == resourcePointer);
+			ISurface surface = Surfaces.Find(s => ((Resource) s.Role).resource == resourcePointer);
 			RemoveSurface(surface);
 		}
 
-		public static ISurface GetSurface(IntPtr surfacePtr)
+		public static WMSurface FindSurface(IntPtr surfacePtr)
 		{
-			return Surfaces.Find(r => ((Resource) r).resource == surfacePtr);
+			return Surfaces.Find(s => s.resource == surfacePtr);
+		}
+
+		public void Cleanup()
+		{
+			Console.WriteLine("Cleaning up");
+			tty.ExitTTY();				
+			display.Terminate();
+			this.Dispose(); // Reset CRTC properly
+    		System.Environment.Exit(1);	
 		}
 		
 		protected override void OnLoad(EventArgs e)
 		{
 			base.OnLoad(e);
-			Title = "Compositor.NET";
+			Title = "WindowManager.NET";
 			GL.ClearColor(0.3f, 0.3f, 0.3f, 1.0f);
 			context = new Xkb.Context();
 			keymap = new Xkb.Keymap(context, "evdev", "apple", "gb", "", "");
 			state = new Xkb.State(keymap);
 			EvdevKeyboard.Initialize();
+
+			tty = new TTY();
 		}
 
 		protected override void OnResize(EventArgs e)
 		{
   			base.OnResize(e);
-			Starfury.renderNeeded = true;
+			WindowManager.renderNeeded = true;
 		}
 
 		protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
 		{
+			this.Cleanup();
 			base.OnClosing(e);
-			display.Terminate();
-			System.Diagnostics.Process.GetCurrentProcess().Kill();
 		}
 
 		protected override void OnRenderFrame(FrameEventArgs e)
@@ -85,14 +107,26 @@ namespace Starfury
 			display.GetEventLoop().Dispatch(10);
 			display.FlushClients();
 
-			if (Starfury.renderNeeded)
+			//foreach(WMSurface surface in Surfaces)
+			//{
+			//	Console.WriteLine(surface.client);
+			//}
+			if (WindowManager.renderNeeded)
 			{
             	GL.Viewport(0, 0, Width, Height);
                 GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
 				CurrentVirtualDesktop.CurrentMode.Render(Width, Height);
 				SwapBuffers();
-				Starfury.renderNeeded = false;
+				WindowManager.renderNeeded = false;
+			}
+			
+			if (Time.ElapsedMilliseconds - lastTime > 5000)
+			{
+				//Console.WriteLine("COLLECTING AT: " + Time.ElapsedMilliseconds);
+				GC.Collect();
+				GC.WaitForPendingFinalizers();
+				lastTime = Time.ElapsedMilliseconds;
 			}
 		}
 
@@ -130,14 +164,13 @@ namespace Starfury
 		
 		static void Main(string[] args) {
 
-			Starfury compositor = new Starfury();
-			Starfury.Compositor = compositor;
+			WindowManager compositor = new WindowManager();
+			WindowManager.Compositor = compositor;
 
 			Console.CancelKeyPress +=
 				(sender, e) => {
 					Console.WriteLine("CTRL+C detected!\n");
-					display.Terminate();
-					System.Diagnostics.Process.GetCurrentProcess().Kill();
+					compositor.Cleanup();
 			};
 
 			compositor.KeyDown += delegate (object sender, KeyboardKeyEventArgs e)
@@ -147,13 +180,17 @@ namespace Starfury
                 	Console.WriteLine(e.Key);
 					if (e.Key == Key.Q)
 					{
-						display.Terminate();
-						compositor.Dispose(); // Reset CRTC properly
-    					System.Environment.Exit(1);
+						compositor.Cleanup();
 					}
 					else
 					{
-						CurrentVirtualDesktop.CurrentMode.KeyPress((uint) Starfury.Time.ElapsedMilliseconds, EvdevKeyboard.Keycode[e.Key], 1);	
+						state.KeyGetOneSym(EvdevKeyboard.Keycode[e.Key] + 8);
+						state.UpdateKey(EvdevKeyboard.Keycode[e.Key] + 8, 1);
+						Mods[0] = state.SerializeMods(1);
+						Mods[1] = state.SerializeMods(2);
+						Mods[2] = state.SerializeMods(4);
+						Mods[3] = state.SerializeMods(64);
+						CurrentVirtualDesktop.CurrentMode.KeyPress((uint) WindowManager.Time.ElapsedMilliseconds, EvdevKeyboard.Keycode[e.Key], 1);	
 					}
 				}
 
@@ -163,23 +200,29 @@ namespace Starfury
 			{
 				if(!e.IsRepeat)
 				{
-					CurrentVirtualDesktop.CurrentMode.KeyPress((uint) Starfury.Time.ElapsedMilliseconds, EvdevKeyboard.Keycode[e.Key], 0);
+					state.KeyGetOneSym(EvdevKeyboard.Keycode[e.Key] + 8);
+					state.UpdateKey(EvdevKeyboard.Keycode[e.Key] + 8, 0);
+					Mods[0] = state.SerializeMods(1);
+					Mods[1] = state.SerializeMods(2);
+					Mods[2] = state.SerializeMods(4);
+					Mods[3] = state.SerializeMods(64);
+					CurrentVirtualDesktop.CurrentMode.KeyPress((uint) WindowManager.Time.ElapsedMilliseconds, EvdevKeyboard.Keycode[e.Key], 0);
 				}
             };
 
 			compositor.Mouse.ButtonDown += delegate (object sender, MouseButtonEventArgs e)
 			{
-				CurrentVirtualDesktop.CurrentMode.MouseButton((uint) Starfury.Time.ElapsedMilliseconds, 0x110, 1);
+				CurrentVirtualDesktop.CurrentMode.MouseButton((uint) WindowManager.Time.ElapsedMilliseconds, 0x110, 1);
 			};
 
 			compositor.Mouse.ButtonUp += delegate (object sender, MouseButtonEventArgs e)
 			{
-				CurrentVirtualDesktop.CurrentMode.MouseButton((uint) Starfury.Time.ElapsedMilliseconds, 0x110, 0);
+				CurrentVirtualDesktop.CurrentMode.MouseButton((uint) WindowManager.Time.ElapsedMilliseconds, 0x110, 0);
 			};
 
 			compositor.Mouse.Move += delegate (object sender, MouseMoveEventArgs e)
 			{
-				CurrentVirtualDesktop.CurrentMode.MouseMove((uint) Starfury.Time.ElapsedMilliseconds, compositor.Mouse.X, compositor.Mouse.Y);
+				CurrentVirtualDesktop.CurrentMode.MouseMove((uint) WindowManager.Time.ElapsedMilliseconds, compositor.Mouse.X, compositor.Mouse.Y);
 			};
 			
 			compositor.InitializeWayland();

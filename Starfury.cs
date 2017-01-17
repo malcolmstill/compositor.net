@@ -11,9 +11,9 @@ using System.Runtime.InteropServices;
 using System.Collections.Generic;
 using System.Threading;
 
-namespace Starfury
+namespace WindowManager
 {
-    class Starfury : GameWindow
+    class WindowManager : GameWindow
     {
 		public static Display display = new Display();
 		public static List<ISurface> surfaces = new List<ISurface>();
@@ -100,7 +100,7 @@ namespace Starfury
 		
 		static void Main(string[] args) {
 
-			Starfury compositor = new Starfury();
+			WindowManager compositor = new WindowManager();
 
 			Console.CancelKeyPress +=
 				(sender, e) => {

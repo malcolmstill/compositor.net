@@ -1,8 +1,10 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using Wayland.Server;
 
-namespace Starfury
+namespace WindowManager
 {
     public class KeyBinding
     {
@@ -82,7 +84,37 @@ namespace Starfury
 
         public virtual ISurface SurfaceUnderPointer(int x, int y)
         {
-            return null;
+            foreach (ISurface surface in this.virtualDesktop.Surfaces.AsEnumerable().Reverse())
+            {
+                if (surface.Surface.InputRegion == null)
+                {
+                    if (x >= surface.X && x <= (surface.X + surface.Surface.Width) && y >= surface.Y && y <= (surface.Y + surface.Surface.Height))
+                    {
+                        return surface;
+                    }
+                }
+                else
+                {
+                    bool inSurface = false;
+                    foreach (WlRect rect in surface.Surface.InputRegion.Rects.AsEnumerable().Reverse())
+                    {
+                        if (rect.operation == WlRect.Operation.ADD && rect.ContainsPoint(x - surface.X, y - surface.Y))
+                        {
+                            inSurface = true;
+                            break;
+                        }
+                        if (rect.operation == WlRect.Operation.ADD && rect.ContainsPoint(x - surface.X, y - surface.Y))
+                        {
+                            break;
+                        }
+                    }
+                    if (inSurface)
+                    {
+                        return surface;
+                    }
+                }
+            }        
+            return null;  
         }
     }
 }

@@ -1,6 +1,6 @@
 using System;
 
-namespace Starfury
+namespace WindowManager
 {
 
 }

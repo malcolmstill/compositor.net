@@ -3,13 +3,13 @@ using System;
 using Wayland.Server;
 using Wayland.Server.Protocol;
 
-namespace Starfury
+namespace WindowManager
 {
     public class CompositorGlobal : WlCompositorGlobal
     {
 			public override void Bind(IntPtr client, IntPtr data, UInt32 version, UInt32 id)
 			{
-				SfCompositor compositor = new SfCompositor(client, id);
+				WMCompositor compositor = new WMCompositor(client, 1, id);
 			}
     }
 }

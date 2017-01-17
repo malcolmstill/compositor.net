@@ -4,12 +4,13 @@ using Wayland.Server;
 using Wayland.Server.Protocol;
 using XdgShellUnstableV6.Server.Protocol;
 using System.Runtime.InteropServices;
+using System.Collections.Generic;
 
-namespace Starfury
+namespace WindowManager
 {
-    public class SfXdgToplevelV6 : ZxdgToplevelV6, ISurface
+    public class WMXdgToplevelV6 : ZxdgToplevelV6, ISurface
     {
-		public SfXdgSurfaceV6 sfXdgSurfaceV6 { get; set; }
+		public WMXdgSurfaceV6 WMXdgSurfaceV6 { get; set; }
 		public int X { get; set; } = 0;
 		public int Y { get; set; } = 0;
 		public int Width { get; set; }
@@ -17,38 +18,43 @@ namespace Starfury
 		public int originX { get; set; } = 0;
 		public int originY { get; set; } = 0;
 
-		public SfXdgToplevelV6(IntPtr client, UInt32 id) : base(client, id)
+		public WMXdgToplevelV6(IntPtr client, Int32 version, UInt32 id) : base(client, version, id)
 		{
 		
 		}
 
-		public SfXdgToplevelV6(IntPtr client, UInt32 id, IntPtr resource) : base(client, id, resource)
+		public WMXdgToplevelV6(IntPtr client, Int32 version, UInt32 id, IntPtr resource) : base(client, version, id, resource)
 		{
-			IntPtr xdgSurfacePtr = resource; //Resource.GetUserData(resource);
+			IntPtr xdgSurfacePtr = resource;
 			Resource r = this.client.FindResource(xdgSurfacePtr);
 			if (r != null)
 			{
-				this.sfXdgSurfaceV6 = (SfXdgSurfaceV6) r;
+				this.WMXdgSurfaceV6 = (WMXdgSurfaceV6) r;
+				this.WMXdgSurfaceV6.Surface.Role = this;
 			}
 		}
 
-		/*
-		public override void Destroy(IntPtr client, IntPtr resource)
+		public override void SetMinSize(IntPtr client, IntPtr resource, Int32 width, Int32 height)
 		{
-			Console.WriteLine("Surface removed " + this);
-			Starfury.RemoveSurface(this.resource); 
-			this.Remove();
+
 		}
-		*/
+
+		public override void SetMaxSize(IntPtr client, IntPtr resource, Int32 width, Int32 height)
+		{
+
+		}
 
 		public override void Delete(IntPtr resource)
 		{
-			Starfury.RemoveSurface(this);
+			Console.WriteLine("Delete called on " + this);
+			WindowManager.RemoveSurface(this);
 		}
 
-		public SfSurface GetSurface()
+		public WMSurface Surface
 		{
-			return sfXdgSurfaceV6.GetSurface();
+			get {
+				return WMXdgSurfaceV6.Surface;
+			}
 		}
 
 		public void Render()
@@ -61,101 +67,120 @@ namespace Starfury
 			WlArray array = new WlArray();
 			array.Set(array.Add(4), 4);
 			this.SendConfigure(0, 0, array.array);
-			this.sfXdgSurfaceV6.SendConfigure(0);
+			this.WMXdgSurfaceV6.SendConfigure(0);
 		}
 
 		public void Deactivate()
 		{
 			WlArray array = new WlArray();
 			this.SendConfigure(0, 0, array.array);
-			this.sfXdgSurfaceV6.SendConfigure(0);
+			this.WMXdgSurfaceV6.SendConfigure(0);
 		}
 
 		public void SendMouseButton(uint time, uint button, uint state)
 		{
-			this.GetSurface().SendMouseButton(time, button, state);
+			this.Surface.SendMouseButton(time, button, state);
 		}
 
 		public void SendMouseEnter(int x, int y)
 		{
-			this.GetSurface().SendMouseEnter(x, y);
+			this.Surface.SendMouseEnter(x, y);
 		}
 
 		public void SendMouseLeave()
 		{
-			this.GetSurface().SendMouseLeave();
+			this.Surface.SendMouseLeave();
 		}
 
 		public void SendMouseMove(uint time, int x, int y)
 		{
-			this.GetSurface().SendMouseMove(time, x, y);
+			this.Surface.SendMouseMove(time, x, y);
 		}
 
 		public void SendKeyboardEnter()
 		{
-			this.GetSurface().SendKeyboardEnter();
+			this.Surface.SendKeyboardEnter();
 		}
 		
 		public void SendKeyboardLeave()
 		{
-			this.GetSurface().SendKeyboardLeave();
+			this.Surface.SendKeyboardLeave();
 		}
 
 		public void SendKey(uint time, uint key, uint state)
 		{
-			this.GetSurface().SendKey(time, key, state);
+			this.Surface.SendKey(time, key, state);
 		}
+
+		public void SendMods(uint mods_depressed, uint mods_latched, uint mods_locked, uint group)
+		{
+			this.Surface.SendMods(mods_depressed, mods_latched, mods_locked, group);
+		}
+
+		public List<ISurface> Subsurfaces { get; set; } = new List<ISurface>();
 
 		public override void Move(IntPtr client, IntPtr resource, IntPtr seat, UInt32 serial)
 		{
-			Starfury.MovingSurface = new MovingSurface(this, this.X, this.Y, Starfury.Compositor.Mouse.X, Starfury.Compositor.Mouse.Y);
+			WindowManager.MovingSurface = new MovingSurface(this, this.X, this.Y, WindowManager.Compositor.Mouse.X, WindowManager.Compositor.Mouse.Y);
 		}
+		
     }
     
-    public class SfXdgSurfaceV6 : ZxdgSurfaceV6, ISurface
+    public class WMXdgSurfaceV6 : ZxdgSurfaceV6, ISurface
     {
-		public SfSurface sfSurface { get; set; }
+		public WMSurface WMSurface { get; set; }
 		public int X { get; set; } = 0;
 		public int Y { get; set; } = 0;
 		public int Width { get; set; }
 		public int Height { get; set; }
 
-		public SfXdgSurfaceV6(IntPtr client, UInt32 id) : base(client, id)
+		public WMXdgSurfaceV6(IntPtr client, Int32 version, UInt32 id) : base(client, version, id)
 		{
 		
 		}
 
-		public SfXdgSurfaceV6(IntPtr client, UInt32 id, IntPtr resource) : base(client, id, resource)
+		public WMXdgSurfaceV6(IntPtr client, Int32 version, UInt32 id, IntPtr resource) : base(client, version, id, resource)
 		{
 			IntPtr surfacePtr = Resource.GetUserData(resource);
 			Resource r = this.client.FindResource(surfacePtr);
 			if (r != null)
 			{
-				this.sfSurface = (SfSurface) r;
+				this.WMSurface = (WMSurface) r;
+				this.WMSurface.Role = this;
 			}
 		}
 
 		public override void GetToplevel(IntPtr client, IntPtr resource, UInt32 id)
 		{
-			SfXdgToplevelV6 sfXdgToplevelV6 = new SfXdgToplevelV6(client, id, this.resource);
+			WMXdgToplevelV6 WMXdgToplevelV6 = new WMXdgToplevelV6(client, 1, id, this.resource);
 
-			Starfury.RemoveSurface(this.resource); 
-			Starfury.Surfaces.Add(sfXdgToplevelV6);
-			Starfury.CurrentVirtualDesktop.Surfaces.Add(sfXdgToplevelV6);
+			//WindowManager.RemoveSurface(this.resource); Don't need this anymore because we just store the WMSurface in list of Surfaces 
+			// ...and we can access the current role via .Role
+			//WindowManager.Surfaces.Add(WMXdgToplevelV6);
+			
+			// HERE
+			WindowManager.CurrentVirtualDesktop.Surfaces.Add(WMXdgToplevelV6);
 
 			WlArray array = new WlArray();
-			sfXdgToplevelV6.SendConfigure(0, 0, array.array);
-			sfXdgToplevelV6.sfXdgSurfaceV6.SendConfigure(0);
+			WMXdgToplevelV6.SendConfigure(0, 0, array.array);
+			WMXdgToplevelV6.WMXdgSurfaceV6.SendConfigure(0);
 		}
 
 		public override void Delete(IntPtr resource)
 		{
-			Starfury.RemoveSurface(this);
+			WindowManager.RemoveSurface(this);
 		}
 
-		public SfSurface GetSurface()
+		public override void SetWindowGeometry(IntPtr client, IntPtr resource, Int32 x, Int32 y, Int32 width, Int32 height)
 		{
-			return sfSurface;
+			
+		}
+
+		public WMSurface Surface
+		{
+			get {
+				return WMSurface;
+			}
 		}
 
 		public void Render()
@@ -175,48 +200,55 @@ namespace Starfury
 
 		public void SendMouseButton(uint time, uint button, uint state)
 		{
-			this.GetSurface().SendMouseButton(time, button, state);
+			this.Surface.SendMouseButton(time, button, state);
 		}
 
 		public void SendMouseEnter(int x, int y)
 		{
-			this.GetSurface().SendMouseEnter(x, y);
+			this.Surface.SendMouseEnter(x, y);
 		}
 
 		public void SendMouseLeave()
 		{
-			this.GetSurface().SendMouseLeave();
+			this.Surface.SendMouseLeave();
 		}
 
 		public void SendMouseMove(uint time, int x, int y)
 		{
-			this.GetSurface().SendMouseMove(time, x, y);
+			this.Surface.SendMouseMove(time, x, y);
 		}		
 
 		public void SendKeyboardEnter()
 		{
-			this.GetSurface().SendKeyboardEnter();
+			this.Surface.SendKeyboardEnter();
 		}
 		
 		public void SendKeyboardLeave()
 		{
-			this.GetSurface().SendKeyboardLeave();
+			this.Surface.SendKeyboardLeave();
 		}
 
 		public void SendKey(uint time, uint key, uint state)
 		{
-			this.GetSurface().SendKey(time, key, state);
+			this.Surface.SendKey(time, key, state);
 		}
+
+		public void SendMods(uint mods_depressed, uint mods_latched, uint mods_locked, uint group)
+		{
+			this.Surface.SendMods(mods_depressed, mods_latched, mods_locked, group);
+		}
+
+		public List<ISurface> Subsurfaces { get; set; } = new List<ISurface>();
     }
     
-    public class SfXdgShellV6 : ZxdgShellV6
+    public class WMXdgShellV6 : ZxdgShellV6
     {
-		public SfXdgShellV6(IntPtr client, UInt32 id) : base(client, id)
+		public WMXdgShellV6(IntPtr client, Int32 version, UInt32 id) : base(client, version, id)
 		{
 			
 		}
 
-		public SfXdgShellV6(IntPtr client, UInt32 id, IntPtr resource) : base(client, id, resource)
+		public WMXdgShellV6(IntPtr client, Int32 version, UInt32 id, IntPtr resource) : base(client, version, id, resource)
 		{
 			
 		}
@@ -224,9 +256,9 @@ namespace Starfury
 		public override void GetXdgSurface(IntPtr client, IntPtr resource, UInt32 id, IntPtr surfaceResource)
 		{
 			IntPtr surfacePtr = Resource.GetUserData(surfaceResource);
-			SfXdgSurfaceV6 sfXdgSurface = new SfXdgSurfaceV6(client, id, surfacePtr); // We store the original surface ptr in the new resource
-			Starfury.RemoveSurface(surfaceResource);
-			Starfury.Surfaces.Add(sfXdgSurface);
+			WMXdgSurfaceV6 WMXdgSurface = new WMXdgSurfaceV6(client, 1, id, surfacePtr); // We store the original surface ptr in the new resource
+			//WindowManager.RemoveSurface(surfaceResource);
+			// WindowManager.Surfaces.Add(WMXdgSurface);
 			// We're probably safe to just add this to the global Surface list at the moment...
 			// add to a particular VirtualDesktop on first commit
 		}

@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using Wayland.Server;
 
-namespace Starfury
+namespace WindowManager
 {
     public class VirtualDesktop
     {
@@ -43,9 +43,14 @@ namespace Starfury
             Modes.Pop();
         }
         
-        public void RemoveSurface(ISurface resource)
+        public void RemoveSurface(ISurface surface)
 		{
-			this.Surfaces.Remove(resource);
+            //Console.WriteLine("Calling into VD RemoveSurface: " + surface + "(current ActiveSurface: " + ActiveSurface + ")");
+			this.Surfaces.Remove(surface);
+            if (ActiveSurface == surface)
+            {
+                ActiveSurface = null;
+            }
 		}
 
 		public void RemoveSurface(IntPtr resourcePointer)

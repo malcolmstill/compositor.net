@@ -4,7 +4,7 @@ using System.Linq;
 using OpenTK;
 using OpenTK.Graphics.OpenGL;
 
-namespace Starfury
+namespace WindowManager
 {
     public class DesktopMode : Mode
     {
@@ -25,26 +25,27 @@ namespace Starfury
                                     uniform sampler2D tex;
                                     void main()
                                     {
-                                        outColor = texture(tex, Texcoord);
+                                        vec4 color = texture(tex, Texcoord);
+                                        outColor = vec4(color.b, color.g, color.r, color.a);
                                     }";
         Pipeline desktopPipeline;
         float width;
         float height;
         int orthoLocation;
         Matrix4 orthographicProjection;
-        ISurface ActiveSurface { get; set; }
+        // ISurface virtualDesktop.ActiveSurface { get; set; }
 
         public DesktopMode()
         {
             desktopPipeline = new Pipeline(vertexSource, fragmentSource);
         }
 
-        public void FirstCommit(SfSurface surface)
+        public void FirstCommit(WMSurface surface)
         {
             
         }
         
-        public void RenderSurface(SfSurface surface)
+        public void RenderSurface(WMSurface surface)
         {
 
             int posAttrib = desktopPipeline.GetAttribLocation("position");
@@ -64,64 +65,108 @@ namespace Starfury
             //GL.DisableVertexAttribArray(texAttrib);
 
             GL.Flush();
+            surface.SendDone();
+            //surface.callback.Remove();
+            //surface.callback = null;
         }
 
-        public void RenderSurface(SfXdgToplevelV6 surface)
+        public void RenderSurface(ISurface surface)
         {
-            int translateLocation = desktopPipeline.GetUniformLocation("translate");
-            Matrix4 translate = Matrix4.CreateTranslation(surface.X, surface.Y, 0.0f);
-            GL.UniformMatrix4(translateLocation, false, ref translate);
-            this.RenderSurface(surface.GetSurface());
+            if (surface.Surface.committed)
+            {
+                //Console.WriteLine("Surface offset: " + surface.X + " " + surface.Y);
+                int translateLocation = desktopPipeline.GetUniformLocation("translate");
+                Matrix4 translate = Matrix4.CreateTranslation(surface.X, surface.Y, 0.0f);
+                GL.UniformMatrix4(translateLocation, false, ref translate);
+                this.RenderSurface(surface.Surface);
+                foreach (ISurface subsurface in surface.Surface.Subsurfaces)
+                {
+                    if (subsurface.Surface.committed)
+                    {
+                        translate = Matrix4.CreateTranslation(surface.X + subsurface.X, surface.Y + subsurface.Y, 0.0f);
+                        GL.UniformMatrix4(translateLocation, false, ref translate);
+                        this.RenderSurface(subsurface.Surface);
+                    }
+                }
+            }
         }
+
+        /*
+        public void RenderSurface(WMXdgToplevelV6 surface)
+        {
+            if (surface.Surface.committed)
+            {
+                //Console.WriteLine("Surface offset: " + surface.X + " " + surface.Y);
+                int translateLocation = desktopPipeline.GetUniformLocation("translate");
+                Matrix4 translate = Matrix4.CreateTranslation(surface.X, surface.Y, 0.0f);
+                GL.UniformMatrix4(translateLocation, false, ref translate);
+                this.RenderSurface(surface.Surface);
+                foreach (ISurface subsurface in surface.Subsurfaces)
+                {
+                    // Console.WriteLine("Drawing subsurface: " + subsurface);
+                    if (subsurface.Surface.committed)
+                    {
+                        //Console.WriteLine("Subsurface offset: " + subsurface.X + " " + subsurface.Y);
+                        translate = Matrix4.CreateTranslation(surface.X + subsurface.X, surface.Y + subsurface.Y, 0.0f);
+                        GL.UniformMatrix4(translateLocation, false, ref translate);
+                        this.RenderSurface(subsurface.Surface);
+                    }
+                }
+            }
+
+        }
+        */
 
         public override void KeyPress(uint time, uint key, uint state)
         {
-            Console.WriteLine("DesktopMode: key " + key);
-            ActiveSurface?.SendKey(time, key, state);
+            virtualDesktop.ActiveSurface?.SendKey(time, key, state);
+            virtualDesktop.ActiveSurface?.SendMods(WindowManager.Mods[0], WindowManager.Mods[1], WindowManager.Mods[2], WindowManager.Mods[3]);
         }
 
         public override void MouseMove(uint time, int x, int y)
         {
-            Starfury.MovingSurface?.Update(x, y);
+            WindowManager.MovingSurface?.Update(x, y);
 
-            ISurface surface = SurfaceUnderPointer(Starfury.Compositor.Mouse.X, Starfury.Compositor.Mouse.Y);
-            if (surface != Starfury.PointerSurface)
+            ISurface surface = SurfaceUnderPointer(WindowManager.Compositor.Mouse.X, WindowManager.Compositor.Mouse.Y);
+            if (surface != WindowManager.PointerSurface)
             {
-                Starfury.PointerSurface?.SendMouseLeave();
-                Starfury.PointerSurface = surface;
-                Starfury.PointerSurface?.SendMouseEnter(x - Starfury.PointerSurface.X, y - Starfury.PointerSurface.Y);
+                WindowManager.PointerSurface?.SendMouseLeave();
+                WindowManager.PointerSurface = surface;
+                WindowManager.PointerSurface?.SendMouseEnter(x - WindowManager.PointerSurface.X, y - WindowManager.PointerSurface.Y);
             }
 
-            Starfury.PointerSurface?.SendMouseMove(time, x - Starfury.PointerSurface.X, y - Starfury.PointerSurface.Y);
+            WindowManager.PointerSurface?.SendMouseMove(time, x - WindowManager.PointerSurface.X, y - WindowManager.PointerSurface.Y);
         }
 
         public override void MouseButton(uint time, uint button, uint state)
         {
             // Case where mouse button 1 is released and there is a currently moving surface...
-            if (state == 0 && button == 0x110 && Starfury.MovingSurface != null)
+            if (state == 0 && button == 0x110 && WindowManager.MovingSurface != null)
             {
                 // ...the surface should stop moving
-                Starfury.MovingSurface = null;
+                WindowManager.MovingSurface = null;
             }
 
             // Find the topmost surface under the pointer
-            ISurface surface = SurfaceUnderPointer(Starfury.Compositor.Mouse.X, Starfury.Compositor.Mouse.Y);
-            if (surface != null && surface != ActiveSurface)
+            ISurface surface = SurfaceUnderPointer(WindowManager.Compositor.Mouse.X, WindowManager.Compositor.Mouse.Y);
+            if (surface != null && surface != virtualDesktop.ActiveSurface && state == 1)
             {
-                ActiveSurface?.Deactivate();
-                ActiveSurface?.SendKeyboardLeave();
+                //Console.WriteLine("Deactivating active surface " + virtualDesktop.ActiveSurface);
+                virtualDesktop.ActiveSurface?.Deactivate();
+                virtualDesktop.ActiveSurface?.SendKeyboardLeave();
 
                 this.virtualDesktop.Surfaces.Remove(surface);
                 this.virtualDesktop.Surfaces.Add(surface);
                 surface.Activate();
                 surface.SendKeyboardEnter();
-                ActiveSurface = surface;
+                virtualDesktop.ActiveSurface = surface;
             }
-            else if (surface == null)
+            else if (surface == null && state == 1)
             {
-                ActiveSurface?.Deactivate();
-                ActiveSurface?.SendKeyboardLeave();
-                ActiveSurface = null;
+                //Console.WriteLine("Deactivating active surface " + virtualDesktop.ActiveSurface);
+                virtualDesktop.ActiveSurface?.Deactivate();
+                virtualDesktop.ActiveSurface?.SendKeyboardLeave();
+                virtualDesktop.ActiveSurface = null;
             }
             else
             {
@@ -131,25 +176,30 @@ namespace Starfury
             surface?.SendMouseButton(time, button, state);
         }
 
+        /*
         public override ISurface SurfaceUnderPointer(int x, int y)
         {
             foreach (ISurface surface in this.virtualDesktop.Surfaces.AsEnumerable().Reverse())
             {
-                if (x >= surface.X && x <= (surface.X + surface.GetSurface().Width) && y >= surface.Y && y <= (surface.Y + surface.GetSurface().Height))
+                if (surface.Surace.InputRegion == null)
                 {
-                    return surface;
+                    if (x >= surface.X && x <= (surface.X + surface.Surface.Width) && y >= surface.Y && y <= (surface.Y + surface.Surface.Height))
+                    {
+                        return surface;
+                    }
                 }
             }        
             return null;    
         }
+        */
 
         /*
-        public void RenderSurface(SfSubsurface subsurface)
+        public void RenderSurface(WMSubsurface subsurface)
         {
 
         }
 
-        public void RenderSurface(SfCursor cursor)
+        public void RenderSurface(WMCursor cursor)
         {
 
         }
@@ -167,11 +217,13 @@ namespace Starfury
 
             // Console.WriteLine(this.virtualDesktop);
             // Console.WriteLine(this.virtualDesktop.Surfaces);
-            foreach (dynamic surface in this.virtualDesktop.Surfaces)
+            //Console.WriteLine("Rendering surfaces:");
+            foreach (ISurface surface in this.virtualDesktop.Surfaces)
             {
+                //Console.WriteLine(surface);
                 RenderSurface(surface);
-                surface.GetSurface().SendDone();
             }
+            //Console.WriteLine("Done rendering");
         }
     }
 }
